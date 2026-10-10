@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>snake</title>
+<style>
+  :root {
+    --bg: #e9e4f5;
+    --ink: #2b2a4c;
+    --board: #2b2a4c;
+    --snake: #ffd166;
+    --food: #ef476f;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 16px;
+  }
+  h1 {
+    font-size: clamp(1.2rem, 4vw, 1.9rem);
+    font-weight: 700;
+    margin: 0;
+    text-align: center;
+    letter-spacing: 0.01em;
+  }
+  #game { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  canvas {
+    width: min(90vw, 420px);
+    height: auto;
+    aspect-ratio: 1;
+    background: var(--board);
+    border-radius: 10px;
+    touch-action: none;
+  }
+  #score { font-size: 0.95rem; opacity: 0.7; }
+  #win {
+    display: none;
+    font-size: clamp(3rem, 14vw, 7rem);
+    font-weight: 700;
+  }
+  body.won #game { display: none; }
+  body.won #win { display: block; }
+  body.won #title { display: none; }
+</style>
+</head>
+<body>
+  <h1 id="title">arrive à 10 et t'auras un mot</h1>
+  <div id="game">
+    <canvas id="c" width="420" height="420"></canvas>
+    <div id="score">0 / 10</div>
+  </div>
+  <h1 id="win">un mot</h1>
+
+<script>
+(() => {
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+  const scoreEl = document.getElementById("score");
+  const N = 20, S = canvas.width / N;
+  const GOAL = 10;
+  const SPEED = 120;
+
+  let snake, dir, nextDir, food, score, timer;
+
+  function reset() {
+    snake = [{x: 5, y: 10}, {x: 4, y: 10}, {x: 3, y: 10}];
+    dir = {x: 1, y: 0};
+    nextDir = dir;
+    score = 0;
+    scoreEl.textContent = "0 / " + GOAL;
+    placeFood();
+  }
+
+  function placeFood() {
+    do {
+      food = {x: Math.floor(Math.random() * N), y: Math.floor(Math.random() * N)};
+    } while (snake.some(s => s.x === food.x && s.y === food.y));
+  }
+
+  function setDir(x, y) {
+    // interdit de faire demi-tour
+    if (x === -dir.x && y === -dir.y) return;
+    nextDir = {x, y};
+  }
+
+  document.addEventListener("keydown", e => {
+    const map = {
+      ArrowUp: [0, -1], ArrowDown: [0, 1],
+      ArrowLeft: [-1, 0], ArrowRight: [1, 0]
+    };
+    if (map[e.key]) {
+      e.preventDefault();
+      setDir(...map[e.key]);
+    }
+  });
+
+  // swipe pour mobile
+  let tx, ty;
+  canvas.addEventListener("touchstart", e => {
+    tx = e.touches[0].clientX; ty = e.touches[0].clientY;
+  }, {passive: true});
+  canvas.addEventListener("touchend", e => {
+    const dx = e.changedTouches[0].clientX - tx;
+    const dy = e.changedTouches[0].clientY - ty;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
+    if (Math.abs(dx) > Math.abs(dy)) setDir(dx > 0 ? 1 : -1, 0);
+    else setDir(0, dy > 0 ? 1 : -1);
+  });
+
+  function step() {
+    dir = nextDir;
+    const head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
+
+    const hitWall = head.x < 0 || head.y < 0 || head.x >= N || head.y >= N;
+    const hitSelf = snake.some(s => s.x === head.x && s.y === head.y);
+    if (hitWall || hitSelf) { reset(); draw(); return; }
+
+    snake.unshift(head);
+    if (head.x === food.x && head.y === food.y) {
+      score++;
+      scoreEl.textContent = score + " / " + GOAL;
+      if (score >= GOAL) { win(); return; }
+      placeFood();
+    } else {
+      snake.pop();
+    }
+    draw();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--food");
+    ctx.beginPath();
+    ctx.arc(food.x * S + S / 2, food.y * S + S / 2, S / 2.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--snake");
+    snake.forEach((s, i) => {
+      const pad = i === 0 ? 1 : 2;
+      ctx.beginPath();
+      ctx.roundRect(s.x * S + pad, s.y * S + pad, S - pad * 2, S - pad * 2, 5);
+      ctx.fill();
+    });
+  }
+
+  function win() {
+    clearInterval(timer);
+    document.body.classList.add("won");
+  }
+
+  reset();
+  draw();
+  timer = setInterval(step, SPEED);
+})();
+</script>
+</body>
+</html>
